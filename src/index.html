@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self'; img-src 'self' data:">
+<title>VR Player</title>
+<style>
+  :root { --bg:#0b0b0d; --panel:rgba(20,20,24,.88); --fg:#eee; --muted:#999; --accent:#ff8800; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:14px system-ui,sans-serif; overflow:hidden; user-select:none; }
+  #stage { position:fixed; inset:0; cursor:grab; }
+  #stage.drag { cursor:grabbing; }
+  #picker { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center; padding:16px; }
+  #picker.hidden { display:none; }
+  #picker img { width:96px; height:96px; opacity:.9; }
+  #picker h1 { margin:0; font-size:22px; font-weight:600; }
+  #picker button { background:var(--accent); color:#000; border:none; padding:12px 22px; border-radius:8px; font-weight:600; }
+  #picker p { color:var(--muted); margin:0; max-width:460px; line-height:1.5; }
+  body.dragover #picker { outline:3px dashed var(--accent); outline-offset:-16px; }
+  #bar { position:fixed; left:0; right:0; bottom:0; padding:8px 14px 10px; background:var(--panel); transition:opacity .3s; }
+  #bar.hidden { display:none; }
+  #bar.fade { opacity:0; }
+  #seekwrap { position:relative; height:18px; display:flex; align-items:center; cursor:pointer; margin-bottom:6px; }
+  #track { position:relative; width:100%; height:6px; background:#3a3a42; border-radius:3px; }
+  #seekwrap:hover #track { height:8px; }
+  #buffered { position:absolute; left:0; top:0; bottom:0; background:#55555f; border-radius:3px; }
+  #played { position:absolute; left:0; top:0; bottom:0; background:var(--accent); border-radius:3px; }
+  #tip { position:absolute; bottom:22px; transform:translateX(-50%); background:#000; color:#fff; padding:2px 6px; border-radius:4px; font-size:12px; pointer-events:none; display:none; font-variant-numeric:tabular-nums; }
+  #seekwrap:hover #tip { display:block; }
+  #row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+  button, select { background:#2a2a30; color:var(--fg); border:1px solid #3a3a42; border-radius:6px; padding:6px 10px; font:inherit; cursor:pointer; }
+  #time { color:var(--muted); font-variant-numeric:tabular-nums; }
+  #volwrap { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; }
+  #volwrap:hover { background:#2a2a30; }
+  #mute { background:none; border:none; padding:2px 4px; font-size:16px; }
+  #voltrack { position:relative; width:110px; height:8px; background:#3a3a42; border-radius:4px; cursor:pointer; }
+  #volfill { position:absolute; left:0; top:0; bottom:0; border-radius:4px; background:linear-gradient(90deg, #4caf50 0 50%, #ffb300 70%, #e53935 100%); background-size:110px 100%; }
+  #volmark { position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:#888; }
+  #volpct { width:42px; text-align:right; font-variant-numeric:tabular-nums; color:var(--muted); }
+  .spacer { flex:1; }
+  #osd { position:fixed; top:16px; right:20px; font-size:22px; font-weight:600; color:#fff; text-shadow:0 0 4px #000, 0 0 2px #000; opacity:0; transition:opacity .4s; pointer-events:none; }
+  #hint { position:fixed; top:12px; left:50%; transform:translateX(-50%); background:var(--panel); padding:6px 12px; border-radius:6px; color:var(--muted); font-size:12px; transition:opacity 1s; pointer-events:none; text-align:center; }
+  body.hidecursor, body.hidecursor * { cursor:none !important; }
+  #err { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--panel); padding:16px 20px; border-radius:8px; max-width:420px; text-align:center; display:none; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="picker">
+  <img src="icon.png" alt="">
+  <h1>VR Player</h1>
+  <button id="pick">Open video…</button>
+  <p>…or drag a video onto this window.<br>Plays VR180 and 360° videos, side-by-side or top-bottom.</p>
+</div>
+
+<div id="hint" style="opacity:0">Drag to look · Scroll for volume · Ctrl+Scroll to zoom · Scroll on timeline to seek<br>Space pause · ←/→ 10s · ↑/↓ volume · M mute · F fullscreen</div>
+<div id="osd"></div>
+<div id="err"></div>
+
+<div id="bar" class="hidden">
+  <div id="seekwrap"><div id="track"><div id="buffered"></div><div id="played"></div></div><div id="tip">0:00</div></div>
+  <div id="row">
+    <button id="play">⏸</button>
+    <span id="time">0:00 / 0:00</span>
+    <div id="volwrap" title="Scroll to change volume (up to 200%)">
+      <button id="mute">🔊</button>
+      <div id="voltrack"><div id="volfill"></div><div id="volmark"></div></div>
+      <span id="volpct">100%</span>
+    </div>
+    <span class="spacer"></span>
+    <select id="mode" title="Video format">
+      <option value="180sbs">180° Side-by-Side</option>
+      <option value="360sbs">360° Side-by-Side</option>
+      <option value="180tb">180° Top-Bottom</option>
+      <option value="360tb">360° Top-Bottom</option>
+      <option value="360mono">360° Mono</option>
+    </select>
+    <button id="eye" title="Which eye's image to show">Left eye</button>
+    <button id="center" title="Reset view">Center</button>
+    <button id="fs">Fullscreen</button>
+    <button id="open">Open…</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from './three.module.js';
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('vrp.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('vrp.' + k, JSON.stringify(v)); } catch {} }
+};
+
+const stage = $('stage');
+const video = document.createElement('video');
+video.playsInline = true;
+
+// ---------- 3D view ----------
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1100);
+const texture = new THREE.VideoTexture(video);
+texture.colorSpace = THREE.SRGBColorSpace;
+texture.minFilter = THREE.LinearFilter;
+const material = new THREE.MeshBasicMaterial({ map:texture });
+let mesh = null;
+let mode = store.get('mode', '180sbs'), eye = store.get('eye', 0);
+
+function buildMesh() {
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  const is180 = mode.startsWith('180');
+  const geo = is180
+    ? new THREE.SphereGeometry(500, 96, 64, Math.PI, Math.PI)
+    : new THREE.SphereGeometry(500, 128, 64, 0, Math.PI*2);
+  geo.scale(-1, 1, 1);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    let u = uv.getX(i), v = uv.getY(i);
+    if (mode.endsWith('sbs')) u = u*0.5 + eye*0.5;
+    else if (mode.endsWith('tb')) v = v*0.5 + (1-eye)*0.5;
+    uv.setXY(i, u, v);
+  }
+  uv.needsUpdate = true;
+  mesh = new THREE.Mesh(geo, material);
+  if (!is180) mesh.rotation.y = -Math.PI/2;
+  scene.add(mesh);
+}
+buildMesh();
+
+let lon = 0, lat = 0, dragging = false, px = 0, py = 0;
+stage.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; stage.classList.add('drag'); stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const k = camera.fov / innerHeight;
+  lon -= (e.clientX - px) * k; lat += (e.clientY - py) * k;
+  px = e.clientX; py = e.clientY;
+});
+stage.addEventListener('pointerup', () => { dragging = false; stage.classList.remove('drag'); });
+stage.addEventListener('dblclick', toggleFs);
+// Scroll on video = volume (like VLC); Ctrl+scroll = zoom
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.ctrlKey) {
+    camera.fov = Math.min(110, Math.max(25, camera.fov + Math.sign(e.deltaY)*5));
+    camera.updateProjectionMatrix();
+  } else if (video.src) {
+    setVolume(volume + (e.deltaY < 0 ? 0.05 : -0.05));
+  }
+}, { passive:false });
+
+(function render() {
+  requestAnimationFrame(render);
+  lat = Math.max(-85, Math.min(85, lat));
+  if (mode.startsWith('180')) lon = Math.max(-90, Math.min(90, lon));
+  const phi = THREE.MathUtils.degToRad(90 - lat), theta = THREE.MathUtils.degToRad(lon - 90);
+  camera.lookAt(Math.sin(phi)*Math.cos(theta), Math.cos(phi), Math.sin(phi)*Math.sin(theta));
+  renderer.render(scene, camera);
+})();
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- OSD ----------
+let osdTimer;
+function osd(text) {
+  const el = $('osd'); el.textContent = text; el.style.opacity = 1;
+  clearTimeout(osdTimer); osdTimer = setTimeout(() => el.style.opacity = 0, 1200);
+}
+const fmt = s => { s = Math.max(0, Math.floor(s||0)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), ss = String(s%60).padStart(2,'0'); return h ? `${h}:${String(m).padStart(2,'0')}:${ss}` : `${m}:${ss}`; };
+
+// ---------- Audio (up to 200% via Web Audio gain) ----------
+let audioCtx = null, gainNode = null;
+let volume = store.get('volume', 1), muted = false;
+function initAudio() {
+  if (audioCtx) { audioCtx.resume(); return; }
+  try {
+    audioCtx = new AudioContext();
+    gainNode = audioCtx.createGain();
+    audioCtx.createMediaElementSource(video).connect(gainNode).connect(audioCtx.destination);
+  } catch { audioCtx = null; gainNode = null; }
+  applyVolume();
+}
+function applyVolume() {
+  const v = muted ? 0 : volume;
+  if (gainNode) { video.volume = 1; gainNode.gain.value = v; }
+  else video.volume = Math.min(1, v);
+  $('volfill').style.width = (volume/2*100) + '%';
+  $('volpct').textContent = Math.round(volume*100) + '%';
+  $('mute').textContent = muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔈' : volume <= 1 ? '🔉' : '🔊';
+}
+function setVolume(v, show = true) {
+  volume = Math.round(Math.min(2, Math.max(0, v)) * 100) / 100;
+  muted = false; applyVolume(); store.set('volume', volume);
+  if (show) osd('Volume ' + Math.round(volume*100) + '%');
+}
+function toggleMute() { muted = !muted; applyVolume(); osd(muted ? 'Muted' : 'Volume ' + Math.round(volume*100) + '%'); }
+applyVolume();
+
+$('mute').onclick = toggleMute;
+const volTrack = $('voltrack');
+function volFromPointer(e) { const r = volTrack.getBoundingClientRect(); setVolume((e.clientX - r.left) / r.width * 2); }
+volTrack.addEventListener('pointerdown', e => { volTrack.setPointerCapture(e.pointerId); volFromPointer(e); volTrack.onpointermove = volFromPointer; });
+volTrack.addEventListener('pointerup', () => volTrack.onpointermove = null);
+$('volwrap').addEventListener('wheel', e => {
+  e.preventDefault(); e.stopPropagation();
+  setVolume(volume + (e.deltaY < 0 ? 0.05 : -0.05));
+}, { passive:false });
+
+// ---------- Timeline ----------
+const seekWrap = $('seekwrap'), track = $('track'), tip = $('tip');
+const SCROLL_SEEK = 5; // seconds per scroll notch (hold Shift for 30s)
+function seekTo(t) {
+  if (!video.duration) return;
+  video.currentTime = Math.min(video.duration - 0.1, Math.max(0, t));
+  updateTimeline();
+}
+function timeAt(e) { const r = track.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * (video.duration || 0); }
+seekWrap.addEventListener('pointerdown', e => {
+  seekWrap.setPointerCapture(e.pointerId); seekTo(timeAt(e));
+  seekWrap.onpointermove = ev => { seekTo(timeAt(ev)); moveTip(ev); };
+});
+seekWrap.addEventListener('pointerup', () => seekWrap.onpointermove = null);
+function moveTip(e) {
+  const r = seekWrap.getBoundingClientRect();
+  tip.style.left = Math.min(r.width - 24, Math.max(24, e.clientX - r.left)) + 'px';
+  tip.textContent = fmt(timeAt(e));
+}
+seekWrap.addEventListener('mousemove', moveTip);
+seekWrap.addEventListener('wheel', e => {
+  e.preventDefault(); e.stopPropagation();
+  const step = (e.shiftKey ? 30 : SCROLL_SEEK) * (e.deltaY < 0 ? 1 : -1);
+  seekTo(video.currentTime + step);
+  osd((step > 0 ? '+' : '−') + Math.abs(step) + 's  ' + fmt(video.currentTime) + ' / ' + fmt(video.duration));
+}, { passive:false });
+
+function updateTimeline() {
+  const d = video.duration || 0;
+  $('played').style.width = d ? (video.currentTime/d*100) + '%' : 0;
+  if (video.buffered.length && d) $('buffered').style.width = (video.buffered.end(video.buffered.length-1)/d*100) + '%';
+  $('time').textContent = `${fmt(video.currentTime)} / ${fmt(d)}`;
+}
+video.addEventListener('timeupdate', updateTimeline);
+video.addEventListener('progress', updateTimeline);
+
+// Remember where you left off, per file
+let fileKey = null;
+video.addEventListener('timeupdate', () => { if (fileKey && video.currentTime > 5) store.set('pos.' + fileKey, video.currentTime); });
+video.addEventListener('ended', () => { if (fileKey) store.set('pos.' + fileKey, 0); });
+
+video.addEventListener('error', () => {
+  const el = $('err');
+  el.textContent = 'This video format could not be played. MP4 (H.264) and WebM work best.';
+  el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 5000);
+});
+
+// ---------- Loading ----------
+function load(info) {
+  if (!info) return;
+  initAudio();
+  fileKey = info.name + '|' + info.size;
+  video.src = info.url;
+  video.addEventListener('loadedmetadata', () => {
+    const pos = store.get('pos.' + fileKey, 0);
+    if (pos > 5 && pos < video.duration - 10) { video.currentTime = pos; osd('Resumed at ' + fmt(pos)); }
+  }, { once:true });
+  video.play().catch(() => {});
+  document.title = info.name + ' — VR Player';
+  $('picker').classList.add('hidden'); $('bar').classList.remove('hidden');
+  $('hint').style.opacity = 1; setTimeout(() => $('hint').style.opacity = 0, 6000);
+}
+const pick = async () => load(await window.vrp.openDialog());
+$('pick').onclick = pick;
+$('open').onclick = pick;
+window.vrp.onOpenFile(load);
+window.vrp.ready().then(load);
+addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('dragover'); });
+addEventListener('dragleave', () => document.body.classList.remove('dragover'));
+addEventListener('drop', async e => {
+  e.preventDefault(); document.body.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) load(await window.vrp.openDropped(f));
+});
+
+// ---------- Controls ----------
+function togglePlay() { initAudio(); video.paused ? video.play() : video.pause(); }
+async function toggleFs() { window.vrp.setFullscreen(!(await window.vrp.isFullscreen())); }
+$('play').onclick = togglePlay;
+video.addEventListener('play', () => $('play').textContent = '⏸');
+video.addEventListener('pause', () => $('play').textContent = '▶');
+
+$('mode').value = mode;
+$('mode').onchange = e => { mode = e.target.value; store.set('mode', mode); updateEyeLabel(); buildMesh(); e.target.blur(); };
+const eyeBtn = $('eye');
+function updateEyeLabel() { eyeBtn.textContent = mode.endsWith('tb') ? (eye ? 'Bottom' : 'Top') : (eye ? 'Right eye' : 'Left eye'); eyeBtn.disabled = mode === '360mono'; }
+updateEyeLabel();
+eyeBtn.onclick = () => { eye = 1 - eye; store.set('eye', eye); updateEyeLabel(); buildMesh(); };
+$('center').onclick = () => { lon = 0; lat = 0; camera.fov = 75; camera.updateProjectionMatrix(); };
+$('fs').onclick = toggleFs;
+// keep buttons from stealing Space/arrow keys after a click
+document.querySelectorAll('button').forEach(b => b.addEventListener('mouseup', () => b.blur()));
+
+addEventListener('keydown', e => {
+  if (e.code === 'KeyO' && e.ctrlKey) { e.preventDefault(); pick(); return; }
+  if (e.code === 'Escape') { window.vrp.setFullscreen(false); return; }
+  if (!video.src || e.target.tagName === 'SELECT') return;
+  switch (e.code) {
+    case 'Space': e.preventDefault(); togglePlay(); break;
+    case 'ArrowRight': e.preventDefault(); seekTo(video.currentTime + (e.shiftKey ? 3 : 10)); osd('+' + (e.shiftKey ? 3 : 10) + 's'); break;
+    case 'ArrowLeft': e.preventDefault(); seekTo(video.currentTime - (e.shiftKey ? 3 : 10)); osd('−' + (e.shiftKey ? 3 : 10) + 's'); break;
+    case 'ArrowUp': e.preventDefault(); setVolume(volume + 0.05); break;
+    case 'ArrowDown': e.preventDefault(); setVolume(volume - 0.05); break;
+    case 'KeyM': toggleMute(); break;
+    case 'KeyF': case 'F11': e.preventDefault(); toggleFs(); break;
+  }
+});
+
+// Auto-hide control bar and cursor (stays while hovering the bar)
+let idle, overBar = false;
+$('bar').addEventListener('mouseenter', () => overBar = true);
+$('bar').addEventListener('mouseleave', () => overBar = false);
+addEventListener('mousemove', () => {
+  $('bar').classList.remove('fade'); document.body.classList.remove('hidecursor');
+  clearTimeout(idle);
+  idle = setTimeout(() => { if (!video.paused && !overBar && !dragging) { $('bar').classList.add('fade'); document.body.classList.add('hidecursor'); } }, 2500);
+});
+</script>
+</body>
+</html>

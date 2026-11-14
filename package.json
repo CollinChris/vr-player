@@ -1,0 +1,54 @@
+{
+  "name": "vr-player",
+  "productName": "VR Player",
+  "version": "1.0.0",
+  "description": "Lightweight VR180 / 360 video player with VLC-style controls",
+  "main": "main.js",
+  "author": "Collin",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:store": "electron-builder --win appx"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "three": "^0.160.0"
+  },
+  "build": {
+    "appId": "com.collinchris.vrplayer",
+    "productName": "VR Player",
+    "copyright": "Copyright © 2026 Collin",
+    "files": ["main.js", "preload.js", "src/**/*", "build/icon.png"],
+    "fileAssociations": [
+      { "ext": ["mp4", "m4v", "mkv", "webm", "mov"], "name": "Video", "description": "Video file", "role": "Viewer" }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "VR-Player-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "VR-Player-${version}-portable.${ext}"
+    },
+    "appx": {
+      "applicationId": "VRPlayer",
+      "displayName": "VR Player",
+      "identityName": "REPLACE_WITH_PARTNER_CENTER_IDENTITY_NAME",
+      "publisher": "CN=REPLACE-WITH-PARTNER-CENTER-PUBLISHER-ID",
+      "publisherDisplayName": "Collin",
+      "backgroundColor": "#16161c",
+      "artifactName": "VR-Player-${version}.${ext}"
+    },
+    "directories": { "output": "dist", "buildResources": "build" }
+  }
+}
