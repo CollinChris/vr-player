@@ -1,7 +1,7 @@
-﻿{
+{
   "name": "vr-player",
   "productName": "VR Player",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lightweight VR180 / 360 video player with VLC-style controls",
   "main": "main.js",
   "author": "Collin",
