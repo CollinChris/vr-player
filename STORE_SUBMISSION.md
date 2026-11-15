@@ -36,10 +36,10 @@
 **Short description:** Watch VR180 and 360° videos on your PC. Drag to look around, with VLC-style controls.
 
 **Description:**
-VR Player lets you watch VR180 and 360° videos on a normal monitor, with no headset needed. Drag with your mouse to look around the scene and scroll to change the volume. The controls work the way you're used to from desktop video players.
+VR Player lets you watch VR180 and 360° videos on a normal monitor, with no headset needed. Drag with your mouse to look around the scene and scroll to zoom in and out. The controls work the way you're used to from desktop video players.
 
 - Supports 180° and 360° videos in side-by-side, top-bottom and mono formats
-- Drag to look around, and use Ctrl+scroll to zoom
+- Drag to look around, and scroll to zoom
 - Volume boost up to 200%
 - Scroll over the timeline to skip forward or back
 - Remembers where you stopped in each video

@@ -55,7 +55,7 @@
   <p>…or drag a video onto this window.<br>Plays VR180 and 360° videos, side-by-side or top-bottom.</p>
 </div>
 
-<div id="hint" style="opacity:0">Drag to look · Scroll for volume · Ctrl+Scroll to zoom · Scroll on timeline to seek<br>Space pause · ←/→ 10s · ↑/↓ volume · M mute · F fullscreen</div>
+<div id="hint" style="opacity:0">Drag to look · Scroll to zoom · Scroll on volume bar for volume · Scroll on timeline to seek<br>Space pause · ←/→ 10s · ↑/↓ volume · M mute · F fullscreen</div>
 <div id="osd"></div>
 <div id="err"></div>
 
@@ -142,15 +142,11 @@ stage.addEventListener('pointermove', e => {
 });
 stage.addEventListener('pointerup', () => { dragging = false; stage.classList.remove('drag'); });
 stage.addEventListener('dblclick', toggleFs);
-// Scroll on video = volume (like VLC); Ctrl+scroll = zoom
+// Scroll on video = zoom in/out
 stage.addEventListener('wheel', e => {
   e.preventDefault();
-  if (e.ctrlKey) {
-    camera.fov = Math.min(110, Math.max(25, camera.fov + Math.sign(e.deltaY)*5));
-    camera.updateProjectionMatrix();
-  } else if (video.src) {
-    setVolume(volume + (e.deltaY < 0 ? 0.05 : -0.05));
-  }
+  camera.fov = Math.min(110, Math.max(25, camera.fov + Math.sign(e.deltaY)*5));
+  camera.updateProjectionMatrix();
 }, { passive:false });
 
 (function render() {

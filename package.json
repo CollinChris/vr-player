@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "vr-player",
   "productName": "VR Player",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Lightweight VR180 / 360 video player with VLC-style controls",
   "main": "main.js",
   "author": "Collin",
@@ -20,7 +20,7 @@
   "build": {
     "appId": "com.collinchris.vrplayer",
     "productName": "VR Player",
-    "copyright": "Copyright © 2026 Collin",
+    "copyright": "Copyright Â© 2026 Collin",
     "files": ["main.js", "preload.js", "src/**/*", "build/icon.png"],
     "fileAssociations": [
       { "ext": ["mp4", "m4v", "mkv", "webm", "mov"], "name": "Video", "description": "Video file", "role": "Viewer" }

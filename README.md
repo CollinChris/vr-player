@@ -7,9 +7,9 @@ A lightweight Windows player for **VR180 and 360° videos** that you watch on a 
 ## Features
 
 - **Formats:** 180° side-by-side (the usual VR180 layout), 360° side-by-side, 180°/360° top-bottom and 360° mono.
-- **Looking around:** drag to look, Ctrl+scroll to zoom, and **Center** resets the view.
+- **Looking around:** drag to look, scroll to zoom, and **Center** resets the view.
 - **VLC-style controls:**
-  - Scroll over the video or the volume bar to change the volume, **up to 200%**.
+  - Scroll over the volume bar to change the volume, **up to 200%**.
   - Scroll over the timeline to seek 5 seconds per notch, or 30 seconds with Shift.
   - Hover over the timeline to preview the time at that point.
   - Keys: Space to pause, ←/→ to skip 10 seconds, ↑/↓ for volume, M to mute, F/F11 or a double-click for fullscreen, and Ctrl+O to open a file.
